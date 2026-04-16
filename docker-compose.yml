@@ -1,0 +1,71 @@
+services:
+  # PostgreSQLデータベース
+  postgres:
+    image: postgres:16-alpine
+    container_name: steam-price-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      TZ: Asia/Tokyo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - steam-price-network
+
+  # Next.js Webアプリケーション
+  web:
+    build:
+      context: ./steam-low-price-web
+      dockerfile: Dockerfile
+    container_name: steam-price-web
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - TZ=Asia/Tokyo
+    ports:
+      - "13000:3000"
+    volumes:
+      - ./steam-low-price-web:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - postgres
+    networks:
+      - steam-price-network
+    command: sh -c "npx prisma generate && npx prisma db push --accept-data-loss && npm run dev"
+
+  # Node.js バッチサーバ（毎日3:00に実行）
+  batch:
+    build:
+      context: ./steam-low-price-batch
+      dockerfile: Dockerfile
+    container_name: steam-price-batch
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - TZ=Asia/Tokyo
+      # LINE Messaging API アクセストークン
+      - LINE_ACCESS_TOKEN=[LINE ACCESS TOKEN]
+      # テスト用（10秒おきに実行）※本番前にコメントアウトすること
+      - TEST_MODE=false
+      # 本番用（毎日3:00実行）※本番時はTEST_MODEをコメントアウトして、以下を有効化
+      - CRON_SCHEDULE=0 3 * * *
+    volumes:
+      - ./steam-low-price-batch:/app
+      - /app/node_modules
+    depends_on:
+      - postgres
+    networks:
+      - steam-price-network
+
+networks:
+  steam-price-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
