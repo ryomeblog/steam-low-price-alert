@@ -21,7 +21,38 @@ model LowestPrice {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
 
+  folders     GameFolder[]
+
   @@index([createdAt])
   @@index([title])
   @@map("lowest_prices")
+}
+
+// フォルダテーブル（ゲーム分類用ラベル）
+model Folder {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String    @db.VarChar(100)
+  color     String    @db.VarChar(7)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+
+  games     GameFolder[]
+
+  @@index([sortOrder])
+  @@map("folders")
+}
+
+// ゲーム-フォルダ中間テーブル（多対多）
+model GameFolder {
+  gameId    String   @map("game_id") @db.Uuid
+  folderId  String   @map("folder_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
+
+  game      LowestPrice @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  folder    Folder      @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, folderId])
+  @@index([folderId])
+  @@map("game_folders")
 }
